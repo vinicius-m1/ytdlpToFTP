@@ -1,6 +1,7 @@
 #!/bin/bash
 
-downloadpath="/home/$USER/Downloads/ytdl"
+downloadpath="./videos"
+archivepath=$PWD
 
 echo "Enter youtube link:"
 read link
@@ -20,7 +21,7 @@ fi
 
 cd "$downloadpath"
 
-yt-dlp -i  -f 'bestvideo[height<='$quality']+bestaudio/best[height<='$quality']' --embed-metadata --all-subs --embed-subs --embed-thumbnail   -o "[%(channel).30s]: %(title).60s [%(upload_date)s].%(ext)s" --download-archive "$downloadpath/youtube.archive.txt" "$link"
+yt-dlp -i  -f 'bestvideo[height<='$quality']+bestaudio/best[height<='$quality']' --embed-metadata --all-subs --embed-subs --embed-thumbnail   -o "[%(channel).30s]: %(title).60s [%(upload_date)s].%(ext)s" --download-archive "$archivepath/youtube.archive.txt" "$link"
 
 
 echo "Finished downloading."

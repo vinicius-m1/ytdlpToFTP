@@ -84,6 +84,7 @@ async def check_freeze():
             await asyncio.sleep (10);
             if (old_percentComplete == global_percentComplete):    
                 print (bcolors.FAIL + "  Taking too long: ",time_difference_in_seconds, " - ", old_percentComplete, " = " ,global_percentComplete, bcolors.ENDC); 
+                os.remove("./ytdlpToFTP.pid")
                 os.execv(sys.executable, ['python3'] + sys.argv)
                 #os._exit(1) #
         #achar jeito de terminar a outra função
@@ -153,6 +154,7 @@ async def upload_files():
           if  quant == (quanttotal):
             print (bcolors.WARNING +"[ALERT] Queue has ended, exiting program..."+bcolors.ENDC)
             os._exit(1); 
+            os.remove("./ytdlpToFTP.pid")
 
 async def main():
 
