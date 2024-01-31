@@ -1,4 +1,4 @@
-# Script to automatically upload videos downloaded from by yt-dlp to ddrv ftp server.
+# Script to automatically upload videos downloaded by yt-dlp to ddrv ftp server.
 
 ### **Ambient**
 
