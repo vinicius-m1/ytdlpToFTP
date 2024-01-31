@@ -21,9 +21,10 @@
 - [✔️] Check if the script is already running. (pidfile)
 (To use with Cron)
 
+- [✔️] Add config file with multiple options.
+
 **TODO:**
 
-- Add config file with multiple options.
 - Direct integration with ytdlp download.
 - Refresh queue.
 

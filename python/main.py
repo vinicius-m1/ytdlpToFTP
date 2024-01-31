@@ -8,30 +8,9 @@ from ftplib import FTP
 from pathlib import Path
 from datetime import datetime
 from datetime import timedelta
+from configparser import ConfigParser
 import ftplib
 import pidfile
-
-
-# FTP LOGIN AND SETUP
-
-try:
-    ftp = ftplib.FTP()
-    host = "127.0.0.1"
-    port = 2525
-    ftp.connect(host, port)
-    print (ftp.getwelcome())
-    try:
-        print ("Logging in...")
-        ftp.login("username", "password")
-        ftp.cwd('/ ')
-    except:
-        "failed to login"
-        os._exit(1); 
-except:
-    os._exit(1);       
-
-
-
 
 # GLOBAL VARIABLES
 videosPath = ""
@@ -42,6 +21,57 @@ hora_atual = datetime.now()  # to be removed
 quant = 0    #amount of finished uploads                       
 global_percentComplete = '0';
 
+# LOAD CONFIG FILE
+
+def Setup():
+
+    global videosPath, movePath
+
+
+    config = ConfigParser()
+    config.read("config.ini")
+
+    try:
+        config_data = config['default']
+        print ("Config file loaded. FTP:",config_data['ftp_host'] )
+    except Exception as err:
+        print (err)
+        print(bcolors.FAIL +"Something went wrong while loading config file!"+bcolors.ENDC)
+        os.remove("./ytdlpToFTP.pid")
+        os._exit(1);
+        
+    
+    videosPath = config_data['files_dir']   
+    movePath = config_data['files_move_dir']
+
+
+         # Ftp login and setup
+
+    try: # make it  a function and call on main
+        ftp = ftplib.FTP()
+
+        ftp.connect(config_data['ftp_host'], int(config_data['ftp_port'])) #port has to be int, idk why
+        print (bcolors.HEADER, ftp.getwelcome(), bcolors.ENDC)
+        try:
+            print ("Logging in...")
+
+            ftp.login(config_data['ftp_username'], config_data['ftp_password'])
+            ftp.cwd(config_data['ftp_path'])
+            print (bcolors.OKGREEN+"Logged-in."+bcolors.ENDC)
+
+        except Exception as err:
+            print (err)
+            print(bcolors.FAIL +"Credencials Error!"+bcolors.ENDC)
+            os.remove("./ytdlpToFTP.pid")
+            os._exit(1); 
+    except Exception as err:
+        print (err)
+        print(bcolors.FAIL +"Failed to reach the FTP server"+bcolors.ENDC)
+        
+        os.remove("./ytdlpToFTP.pid") #funtion to dedicated to stop program is really needed
+        os._exit(1);       
+        
+    return(ftp)
 
 
 #PROGRESS PERCENTAGE
@@ -85,9 +115,9 @@ async def check_freeze():
             if (old_percentComplete == global_percentComplete):    
                 print (bcolors.FAIL + "  Taking too long: ",time_difference_in_seconds, " - ", old_percentComplete, " = " ,global_percentComplete, bcolors.ENDC); 
                 os.remove("./ytdlpToFTP.pid")
-                os.execv(sys.executable, ['python3'] + sys.argv)
-                #os._exit(1) #
-        #achar jeito de terminar a outra função
+                os.execv(sys.executable, ['python3'] + sys.argv) #restarts script
+                
+        
         #else:
             #print (bcolors.OKGREEN + " TIME IS OK:", time_difference_in_seconds, bcolors.ENDC)
             
@@ -105,6 +135,7 @@ def format_bytes(size):
 
 # FILE OPERATIONS AND UPLOAD    
 async def upload_files():
+    ftp = Setup();
     global quant
     global quanttotal
     global hora_inicio
@@ -145,7 +176,6 @@ async def upload_files():
           except Exception as err:
               print (err)
               print (bcolors.FAIL + 'An ERROR has occured during the upload!' + bcolors.ENDC)
-              asyncio.sleep (3);
               continue
 
 
@@ -153,15 +183,17 @@ async def upload_files():
  
           if  quant == (quanttotal):
             print (bcolors.WARNING +"[ALERT] Queue has ended, exiting program..."+bcolors.ENDC)
-            os._exit(1); 
             os.remove("./ytdlpToFTP.pid")
-
+            os._exit(1); 
+            
 async def main():
 
 # CHECKS IF ANOTHER INSTANCE IS ALREADY RUNNING
  try:
     with pidfile.PIDFile("./ytdlpToFTP.pid"): #generated in current directory
      
+     Setup();
+
      #run upload and freeze checker together   
      batch = asyncio.gather(upload_files(), check_freeze()) 
      result_upload, result_freeze = await batch     
