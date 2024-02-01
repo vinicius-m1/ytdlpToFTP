@@ -13,11 +13,12 @@ import ftplib
 import pidfile
 
 # GLOBAL VARIABLES
+#check config.ini for details                                                   IMPLEMENT EXIT() AND DELETE/MOVE FILES
 videosPath = ""
 movePath = ""
-quanttotal = 0      
+quanttotal = 0      #to be removed
+limitNoChangeTime=0
 hora_inicio = datetime.now()  
-hora_atual = datetime.now()  # to be removed
 quant = 0    #amount of finished uploads                       
 global_percentComplete = '0';
 
@@ -25,7 +26,7 @@ global_percentComplete = '0';
 
 def Setup():
 
-    global videosPath, movePath
+    global videosPath, movePath, limitNoChangeTime
 
 
     config = ConfigParser()
@@ -43,7 +44,7 @@ def Setup():
     
     videosPath = config_data['files_dir']   
     movePath = config_data['files_move_dir']
-
+    limitNoChangeTime = int(config_data['limitNoChangeTime']) 
 
          # Ftp login and setup
 
@@ -110,7 +111,7 @@ async def check_freeze():
         time_difference_in_seconds = time_difference / timedelta(seconds=1)
         
         #print ("           NEW_PERCENTAGE ", global_percentComplete)
-        if (old_percentComplete == global_percentComplete) and (int(global_percentComplete) !=100)  and (time_difference_in_seconds > 30) :
+        if (old_percentComplete == global_percentComplete) and (time_difference_in_seconds > limitNoChangeTime):
             await asyncio.sleep (10);
             if (old_percentComplete == global_percentComplete):    
                 print (bcolors.FAIL + "  Taking too long: ",time_difference_in_seconds, " - ", old_percentComplete, " = " ,global_percentComplete, bcolors.ENDC); 
@@ -121,17 +122,6 @@ async def check_freeze():
         #else:
             #print (bcolors.OKGREEN + " TIME IS OK:", time_difference_in_seconds, bcolors.ENDC)
             
-# CORRECT SIZE FROM BYTES
-def format_bytes(size):
-    # 2**10 = 1024
-    power = 2**10
-    n = 0
-    power_labels = {0 : "", 1: "kilo", 2: "mega", 3: "giga", 4: "tera"}
-    while size > power:
-        size /= power
-        n += 1
-    return str.format("{0:.2f}", size) , power_labels[n]+ "bytes"
-
 
 # FILE OPERATIONS AND UPLOAD    
 async def upload_files():
@@ -158,7 +148,7 @@ async def upload_files():
               file_path = os.path.join(videosPath, file)      
               fileftp = open(file_path, 'rb')
               totalSize = os.path.getsize(file_path)               #file size
-              print ("Started uploading: ",file," ...(", quant,"/", quanttotal,")", format_bytes((totalSize)) ) #printing file information 
+              print ("Started uploading: ",file," ...(", quant,"/", quanttotal,")", bcolors.OKCYAN, format_bytes(totalSize), bcolors.ENDC ) #printing file information 
               
               
 
@@ -191,8 +181,6 @@ async def main():
 # CHECKS IF ANOTHER INSTANCE IS ALREADY RUNNING
  try:
     with pidfile.PIDFile("./ytdlpToFTP.pid"): #generated in current directory
-     
-     Setup();
 
      #run upload and freeze checker together   
      batch = asyncio.gather(upload_files(), check_freeze()) 
@@ -214,6 +202,20 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+# CORRECT SIZE FROM BYTES
+def format_bytes(size):
+
+    
+    # 2**10 = 1024
+    power = 2**10
+    n = 0
+    power_labels = {0 : "", 1: " kilo", 2: " mega", 3: " giga", 4: " tera"}
+    while size > power:
+        size /= power
+        n += 1
+    output = str(str.format("{0:.2f}", size) + str(power_labels[n])+ "bytes")
+    output.replace("'","")
+    return (output)
 
 
 if __name__ == "__main__":

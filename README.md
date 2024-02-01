@@ -2,8 +2,8 @@
 
 ### **Ambient**
 
-- Linux commands and bash.
-- Python (ftplib), (pidfile)
+- 🐧️ Linux commands and bash.
+- 🐍️ Python (ftplib), (pidfile)
 - [ddrv](https://github.com/forscht/ddrv) 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 - FTP
@@ -26,7 +26,9 @@
 **TODO:**
 
 - Direct integration with ytdlp download.
+- Add more options in config.
 - Refresh queue.
+- Multithreaded file uploading
 
 
 
