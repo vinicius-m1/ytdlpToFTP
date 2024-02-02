@@ -13,15 +13,15 @@ import ftplib
 import pidfile
 
 # GLOBAL VARIABLES
-#check config.ini for details                                                   IMPLEMENT DELETE/MOVE FILES
-videosPath = "b"
+#check config.ini for details                                                   
+videosPath = ""
 movePath = ""
-limitNoChangeTime=0                    
+limitNoChangeTime=0
+minFilesUpload=0                    
 global_percentComplete = '0';
 file_deletion = 'True';
 
 # LOAD CONFIG FILE
-
 def Setup():
 
     global videosPath, movePath, limitNoChangeTime, file_deletion
@@ -37,7 +37,7 @@ def Setup():
         print (err)
         print(bcolors.FAIL +"Something went wrong while loading config file!"+bcolors.ENDC)
         exit()
-        
+    minFilesUpload = int(config_data['minFilesUpload'])    
     file_deletion = config_data['file_deletion']
     videosPath = config_data['files_dir']   
     movePath = config_data['files_move_dir']
@@ -45,7 +45,7 @@ def Setup():
 
          # Ftp login and setup
 
-    try: # make it  a function and call on main
+    try: 
         ftp = ftplib.FTP()
 
         ftp.connect(config_data['ftp_host'], int(config_data['ftp_port'])) #port has to be int, idk why
@@ -98,9 +98,13 @@ class FtpUploadTracker:
 async def check_freeze():   
   while True:
 
-        old_percenteComplete = global_percentComplete
+        old_percentComplete = global_percentComplete
+        
         await asyncio.sleep (limitNoChangeTime);
-        if old_percenteComplete == global_percentComplete:
+
+        #print("current:",global_percentComplete,"old:",old_percentComplete)
+
+        if old_percentComplete == global_percentComplete:
             print (bcolors.FAIL + "  Taking too long: ", " - ", old_percentComplete, " = " ,global_percentComplete, bcolors.ENDC);
             os.remove("./ytdlpToFTP.pid")
             os.execv(sys.executable, ['python3'] + sys.argv) #restarts script
@@ -110,8 +114,9 @@ async def check_freeze():
 # FILE OPERATIONS AND UPLOAD    
 async def upload_files():
 
+    
     async def upload():
-        global ftp;
+        global ftp, global_percentComplete;
         quanttotal= list_files();
 
         
@@ -128,13 +133,13 @@ async def upload_files():
 
                     uploadTracker = FtpUploadTracker(int(totalSize))
                     await asyncio.get_event_loop().run_in_executor(None, ftp.storbinary, f'STOR {file}', fileftp, 1024, uploadTracker.handle) 
-
+                    global_percentComplete = '0'
 
                     quanttotal = quanttotal-1;
 
                     print (bcolors.OKCYAN,datetime.now().strftime('%H:%M:%S'),"[OK] Finished uploading!" + bcolors.ENDC);
 
-                    #shutil.move( file_path,  movePath)
+                    
                     if file_deletion == 'True':            
                         os.remove(file_path)  
                     else: 
@@ -144,7 +149,8 @@ async def upload_files():
                     print (err)
                     print (bcolors.FAIL + 'An ERROR has occured during the upload!' + bcolors.ENDC)
                     continue     
-                                
+                            
+       
     def list_files():
         quanttotal = 0;
         for file in os.listdir(videosPath):
@@ -153,9 +159,9 @@ async def upload_files():
         print(bcolors.OKCYAN + "[INFO]", quanttotal, " files were queued."+ bcolors.ENDC)
         return (quanttotal)
 
-
+    await upload(); 
     quanttotal_list = list_files();
-    if (quanttotal_list > 10):
+    if (quanttotal_list > minFilesUpload):
         print(quanttotal_list," new files found!")
         await upload();
     print("Finished uploading queue!")

@@ -26,8 +26,6 @@
 **TODO:**
 
 - Direct integration with ytdlp download.
-- Add more options in config.
-- Refresh queue.
 - Multithreaded file uploading
 
 
