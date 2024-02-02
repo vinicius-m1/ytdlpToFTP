@@ -13,20 +13,18 @@ import ftplib
 import pidfile
 
 # GLOBAL VARIABLES
-#check config.ini for details                                                   IMPLEMENT EXIT() AND DELETE/MOVE FILES
-videosPath = ""
+#check config.ini for details                                                   IMPLEMENT DELETE/MOVE FILES
+videosPath = "b"
 movePath = ""
-quanttotal = 0      #to be removed
-limitNoChangeTime=0
-hora_inicio = datetime.now()  
-quant = 0    #amount of finished uploads                       
+limitNoChangeTime=0                    
 global_percentComplete = '0';
+file_deletion = 'True';
 
 # LOAD CONFIG FILE
 
 def Setup():
 
-    global videosPath, movePath, limitNoChangeTime
+    global videosPath, movePath, limitNoChangeTime, file_deletion
 
 
     config = ConfigParser()
@@ -38,10 +36,9 @@ def Setup():
     except Exception as err:
         print (err)
         print(bcolors.FAIL +"Something went wrong while loading config file!"+bcolors.ENDC)
-        os.remove("./ytdlpToFTP.pid")
-        os._exit(1);
+        exit()
         
-    
+    file_deletion = config_data['file_deletion']
     videosPath = config_data['files_dir']   
     movePath = config_data['files_move_dir']
     limitNoChangeTime = int(config_data['limitNoChangeTime']) 
@@ -63,16 +60,15 @@ def Setup():
         except Exception as err:
             print (err)
             print(bcolors.FAIL +"Credencials Error!"+bcolors.ENDC)
-            os.remove("./ytdlpToFTP.pid")
-            os._exit(1); 
+            exit() 
     except Exception as err:
         print (err)
         print(bcolors.FAIL +"Failed to reach the FTP server"+bcolors.ENDC)
-        
-        os.remove("./ytdlpToFTP.pid") #funtion to dedicated to stop program is really needed
-        os._exit(1);       
+        exit()
+               
         
     return(ftp)
+
 
 
 #PROGRESS PERCENTAGE
@@ -99,82 +95,71 @@ class FtpUploadTracker:
 
 
 # CHECK IF UPLOAD HAS FREEZED
-async def check_freeze():
-     
+async def check_freeze():   
   while True:
-        old_percentComplete = global_percentComplete
-        #print ("           OLD_PERCENTAGE ", old_percentComplete)
-        await asyncio.sleep (5); #checking frequency
 
-        hora_atual = datetime.now()  
-        time_difference = hora_atual - hora_inicio                              
-        time_difference_in_seconds = time_difference / timedelta(seconds=1)
-        
-        #print ("           NEW_PERCENTAGE ", global_percentComplete)
-        if (old_percentComplete == global_percentComplete) and (time_difference_in_seconds > limitNoChangeTime):
-            await asyncio.sleep (10);
-            if (old_percentComplete == global_percentComplete):    
-                print (bcolors.FAIL + "  Taking too long: ",time_difference_in_seconds, " - ", old_percentComplete, " = " ,global_percentComplete, bcolors.ENDC); 
-                os.remove("./ytdlpToFTP.pid")
-                os.execv(sys.executable, ['python3'] + sys.argv) #restarts script
-                
-        
-        #else:
-            #print (bcolors.OKGREEN + " TIME IS OK:", time_difference_in_seconds, bcolors.ENDC)
+        old_percenteComplete = global_percentComplete
+        await asyncio.sleep (limitNoChangeTime);
+        if old_percenteComplete == global_percentComplete:
+            print (bcolors.FAIL + "  Taking too long: ", " - ", old_percentComplete, " = " ,global_percentComplete, bcolors.ENDC);
+            os.remove("./ytdlpToFTP.pid")
+            os.execv(sys.executable, ['python3'] + sys.argv) #restarts script
+
             
 
 # FILE OPERATIONS AND UPLOAD    
 async def upload_files():
-    ftp = Setup();
-    global quant
-    global quanttotal
-    global hora_inicio
 
-    for file in os.listdir(videosPath):
+    async def upload():
+        global ftp;
+        quanttotal= list_files();
+
+        
+        for file in os.listdir(videosPath):
+            if file.endswith(".json") or file.endswith(".mkv") or file.endswith(".mp4") or file.endswith(".webm"):       
+                try:            
+
+                    file_path = os.path.join(videosPath, file)      
+                    fileftp = open(file_path, 'rb')
+                    totalSize = os.path.getsize(file_path)               #file size
+                    print ("Started uploading:",file,"(",quanttotal,"remaining.)", bcolors.OKCYAN, format_bytes(totalSize), bcolors.ENDC ) #printing file information 
+              
+              
+
+                    uploadTracker = FtpUploadTracker(int(totalSize))
+                    await asyncio.get_event_loop().run_in_executor(None, ftp.storbinary, f'STOR {file}', fileftp, 1024, uploadTracker.handle) 
+
+
+                    quanttotal = quanttotal-1;
+
+                    print (bcolors.OKCYAN,datetime.now().strftime('%H:%M:%S'),"[OK] Finished uploading!" + bcolors.ENDC);
+
+                    #shutil.move( file_path,  movePath)
+                    if file_deletion == 'True':            
+                        os.remove(file_path)  
+                    else: 
+                        shutil.move( file_path,  movePath)
+  
+                except Exception as err:
+                    print (err)
+                    print (bcolors.FAIL + 'An ERROR has occured during the upload!' + bcolors.ENDC)
+                    continue     
+                                
+    def list_files():
+        quanttotal = 0;
+        for file in os.listdir(videosPath):
             if file.endswith(".json") or file.endswith(".mkv") or file.endswith(".mp4") or file.endswith(".webm"):
-               #print (bcolors.WARNING + "file added to counting" + bcolors.ENDC)
                quanttotal = quanttotal + 1;
+        print(bcolors.OKCYAN + "[INFO]", quanttotal, " files were queued."+ bcolors.ENDC)
+        return (quanttotal)
 
-    print(bcolors.OKCYAN + "[INFO]", quanttotal, " files were queued."+ bcolors.ENDC)
 
-    for file in os.listdir(videosPath): 
-     if file.endswith(".json") or file.endswith(".mkv") or file.endswith(".mp4") or file.endswith(".webm"):       
-          try:
-              
-              
-              hora_inicio = datetime.now()                                #marcando o tempo
+    quanttotal_list = list_files();
+    if (quanttotal_list > 10):
+        print(quanttotal_list," new files found!")
+        await upload();
+    print("Finished uploading queue!")
             
-
-              file_path = os.path.join(videosPath, file)      
-              fileftp = open(file_path, 'rb')
-              totalSize = os.path.getsize(file_path)               #file size
-              print ("Started uploading: ",file," ...(", quant,"/", quanttotal,")", bcolors.OKCYAN, format_bytes(totalSize), bcolors.ENDC ) #printing file information 
-              
-              
-
-              uploadTracker = FtpUploadTracker(int(totalSize))
-              await asyncio.get_event_loop().run_in_executor(None, ftp.storbinary, f'STOR {file}', fileftp, 1024, uploadTracker.handle) 
-
-
-              quant =  quant+1
-
-              print (bcolors.OKCYAN,hora_inicio," -    <==[OK]==>   Finished uploading!" + bcolors.ENDC);
-
-              #shutil.move( file_path,  movePath)          
-              os.remove(file_path)  
-
-          except Exception as err:
-              print (err)
-              print (bcolors.FAIL + 'An ERROR has occured during the upload!' + bcolors.ENDC)
-              continue
-
-
-     
- 
-          if  quant == (quanttotal):
-            print (bcolors.WARNING +"[ALERT] Queue has ended, exiting program..."+bcolors.ENDC)
-            os.remove("./ytdlpToFTP.pid")
-            os._exit(1); 
             
 async def main():
 
@@ -202,6 +187,13 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+# CALL TO EXIT PROGRAM
+def exit():
+    
+    os.remove("./ytdlpToFTP.pid")
+    os._exit(0);
+
+
 # CORRECT SIZE FROM BYTES
 def format_bytes(size):
 
@@ -218,7 +210,9 @@ def format_bytes(size):
     return (output)
 
 
+
 if __name__ == "__main__":
+    ftp = Setup();
     asyncio.run(main());
 
-sys.exit() 
+exit()
