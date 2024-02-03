@@ -1,4 +1,4 @@
-# Script to automatically upload videos downloaded by yt-dlp ftp server.
+# Script to automatically upload videos downloaded by yt-dlp to a ftp server.
 
 ### **Ambient**
 
